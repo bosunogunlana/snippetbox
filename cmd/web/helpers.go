@@ -46,10 +46,19 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 	buffer.WriteTo(w)
 }
 
+func (app *application) redirect(w http.ResponseWriter, r *http.Request, destination string) {
+	http.Redirect(w, r, destination, http.StatusSeeOther)
+}
+
+func (app *application) isAuthenticated(r *http.Request) bool {
+	return app.sessionManager.Exists(r.Context(), "authUserID")
+}
+
 func (app *application) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		CurrentYear: time.Now().Year(),
 		Flash: app.sessionManager.PopString(r.Context(), "flash"),
+		IsAuthenticated: app.isAuthenticated(r),
 	}
 }
 

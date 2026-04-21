@@ -44,6 +44,12 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
+	if !app.isAuthenticated(r) {
+		app.sessionManager.Put(r.Context(), "flash", "Signin to view snippet")
+		app.redirect(w, r, "/user/login")
+		return
+	}
+
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
 		http.NotFound(w, r)
@@ -67,10 +73,10 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
-	id := app.sessionManager.GetInt(r.Context(), "authUserID")
-	if id == 0 {
+	if app.isAuthenticated(r) {
 		app.sessionManager.Put(r.Context(), "flash", "Signin to create Snippet")
-		app.redirect(w, r, "/")
+		app.redirect(w, r, "/user/login")
+		return
 	}
 
 	data := app.newTemplateData(r)
@@ -117,6 +123,7 @@ func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
 	if id > 0 {
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
+		return
 	}
 
 	data := app.newTemplateData(r)
@@ -129,6 +136,7 @@ func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
 	if id > 0 {
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
+		return
 	}
 
 	var form userSignupForm
@@ -173,6 +181,7 @@ func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
 	if id > 0 {
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
+		return
 	}
 
 	data := app.newTemplateData(r)
@@ -185,6 +194,7 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 	if id > 0 {
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
+		return
 	}
 
 	var form userLoginForm
@@ -235,6 +245,7 @@ func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
 		app.ServerError(w, r, err)
 		return
 	}
+
 	app.sessionManager.Remove(r.Context(), "authUserID")
 	app.sessionManager.Put(r.Context(), "flash", "You've been logged out successfully!")
 	app.redirect(w, r, "/user/login")
