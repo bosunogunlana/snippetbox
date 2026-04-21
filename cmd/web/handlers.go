@@ -24,6 +24,12 @@ type userSignupForm struct {
 	validator.Validator `form:"-"`
 }
 
+type userLoginForm struct {
+	Email               string `form:"email"`
+	Password            string `form:"password"`
+	validator.Validator `form:"-"`
+}
+
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	snippets, err := app.snippets.Latest()
 	if err != nil {
@@ -61,6 +67,12 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
+	id := app.sessionManager.GetInt(r.Context(), "authUserID")
+	if id == 0 {
+		app.sessionManager.Put(r.Context(), "flash", "Signin to create Snippet")
+		app.redirect(w, r, "/")
+	}
+
 	data := app.newTemplateData(r)
 	data.Form = snippetCreateForm{
 		Expires: 365,
@@ -101,12 +113,24 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
+	id := app.sessionManager.GetInt(r.Context(), "authUserID")
+	if id > 0 {
+		app.logger.Info("already signed in", "id", id)
+		app.redirect(w, r, "/")
+	}
+
 	data := app.newTemplateData(r)
 	data.Form = userSignupForm{}
 	app.render(w, r, http.StatusOK, "signup.html", data)
 }
 
 func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
+	id := app.sessionManager.GetInt(r.Context(), "authUserID")
+	if id > 0 {
+		app.logger.Info("already signed in", "id", id)
+		app.redirect(w, r, "/")
+	}
+
 	var form userSignupForm
 	err := app.decodePostForm(r, &form)
 	if err != nil {
@@ -141,18 +165,77 @@ func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.sessionManager.Put(r.Context(), "flash", "Your signup was successful. Please log in.")
-
-	http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+	app.redirect(w, r, "/user/login")
 }
 
 func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "login.html", app.newTemplateData(r))
+	id := app.sessionManager.GetInt(r.Context(), "authUserID")
+	if id > 0 {
+		app.logger.Info("already signed in", "id", id)
+		app.redirect(w, r, "/")
+	}
+
+	data := app.newTemplateData(r)
+	data.Form = userLoginForm{}
+	app.render(w, r, http.StatusOK, "login.html", data)
 }
 
 func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "signup", app.newTemplateData(r))
+	id := app.sessionManager.GetInt(r.Context(), "authUserID")
+	if id > 0 {
+		app.logger.Info("already signed in", "id", id)
+		app.redirect(w, r, "/")
+	}
+
+	var form userLoginForm
+	err := app.decodePostForm(r, &form)
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	form.CheckField(validator.Notblank(form.Email), "email", "Please enter valid email")
+	form.CheckField(validator.Matches(form.Email, validator.EmailRX), "email", "Please enter valid email")
+	form.CheckField(validator.Notblank(form.Password), "password", "Please enter your password")
+
+	if !form.Valid() {
+		data := app.newTemplateData(r)
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "login.html", data)
+		return
+	}
+
+	id, err = app.users.Authenticate(form.Email, form.Password)
+	if err != nil {
+		if errors.Is(err, models.ErrInvalidCredentials) {
+			form.AddNonFieldError("Email or password is incorrect")
+
+			data := app.newTemplateData(r)
+		  data.Form = form
+			app.render(w, r, http.StatusUnprocessableEntity, "login.html", data)
+		} else {
+			app.ServerError(w, r, err)
+		}
+	}
+
+	err = app.sessionManager.RenewToken(r.Context())
+	if err != nil {
+		app.ServerError(w, r, err)
+		return
+	}
+
+	app.sessionManager.Put(r.Context(), "authUserID", id)
+
+	app.redirect(w, r, "/snippet/create")
 }
 
 func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "signup", app.newTemplateData(r))
+	err := app.sessionManager.RenewToken(r.Context())
+	if err != nil {
+		app.ServerError(w, r, err)
+		return
+	}
+	app.sessionManager.Remove(r.Context(), "authUserID")
+	app.sessionManager.Put(r.Context(), "flash", "You've been logged out successfully!")
+	app.redirect(w, r, "/user/login")
 }
