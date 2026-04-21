@@ -119,9 +119,8 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
-	id := app.sessionManager.GetInt(r.Context(), "authUserID")
-	if id > 0 {
-		app.logger.Info("already signed in", "id", id)
+	if app.isAuthenticated(r) {
+		app.logger.Info("already signed in")
 		app.redirect(w, r, "/")
 		return
 	}
@@ -132,8 +131,8 @@ func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
-	id := app.sessionManager.GetInt(r.Context(), "authUserID")
-	if id > 0 {
+	if app.isAuthenticated(r) {
+		id := app.sessionManager.GetInt(r.Context(), "authUserID")
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
 		return
@@ -177,8 +176,8 @@ func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
-	id := app.sessionManager.GetInt(r.Context(), "authUserID")
-	if id > 0 {
+	if app.isAuthenticated(r) {
+		id := app.sessionManager.GetInt(r.Context(), "authUserID")
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
 		return
@@ -190,8 +189,8 @@ func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
-	id := app.sessionManager.GetInt(r.Context(), "authUserID")
-	if id > 0 {
+	if app.isAuthenticated(r) {
+		id := app.sessionManager.GetInt(r.Context(), "authUserID")
 		app.logger.Info("already signed in", "id", id)
 		app.redirect(w, r, "/")
 		return
@@ -215,7 +214,7 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err = app.users.Authenticate(form.Email, form.Password)
+	id, err := app.users.Authenticate(form.Email, form.Password)
 	if err != nil {
 		if errors.Is(err, models.ErrInvalidCredentials) {
 			form.AddNonFieldError("Email or password is incorrect")
