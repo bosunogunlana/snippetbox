@@ -52,7 +52,11 @@ func (app *application) redirect(w http.ResponseWriter, r *http.Request, destina
 }
 
 func (app *application) isAuthenticated(r *http.Request) bool {
-	return app.sessionManager.Exists(r.Context(), "authUserID")
+	isAuthenticated, ok := r.Context().Value(isAuthenticatedContextKey).(bool)
+	if !ok {
+		return false
+	}
+	return isAuthenticated
 }
 
 func (app *application) newTemplateData(r *http.Request) templateData {
