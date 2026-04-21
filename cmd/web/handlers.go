@@ -73,7 +73,7 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
-	if app.isAuthenticated(r) {
+	if !app.isAuthenticated(r) {
 		app.sessionManager.Put(r.Context(), "flash", "Signin to create Snippet")
 		app.redirect(w, r, "/user/login")
 		return
