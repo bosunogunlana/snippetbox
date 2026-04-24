@@ -44,11 +44,11 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
-	if !app.isAuthenticated(r) {
-		app.sessionManager.Put(r.Context(), "flash", "Signin to view snippet")
-		app.redirect(w, r, "/user/login")
-		return
-	}
+	// if !app.isAuthenticated(r) {
+	// 	app.sessionManager.Put(r.Context(), "flash", "Signin to view snippet")
+	// 	app.redirect(w, r, "/user/login")
+	// 	return
+	// }
 
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
